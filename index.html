@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Caption Studio AI</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090b12;color:#f5f5fa;font:14px Arial}
+header{padding:18px;background:#121622;border-bottom:1px solid #303647}
+h2{margin:0;color:#c5ff62}
+main{padding:14px;max-width:900px;margin:auto}
+.panel{background:#141925;border:1px solid #303647;border-radius:14px;padding:14px;margin:12px 0}
+button,.btn{background:#c5ff62;color:#10120b;border:0;padding:12px;border-radius:8px;font-weight:bold;cursor:pointer}
+input,textarea,select{width:100%;padding:11px;margin:7px 0;background:#090d16;color:white;border:1px solid #3a4254;border-radius:8px}
+video{width:100%;max-height:420px;background:#000;border-radius:10px}
+.stage{position:relative;text-align:center}
+#caption{position:absolute;bottom:9%;left:3%;right:3%;font-weight:900;font-size:clamp(22px,5vw,40px);color:#ffe45e;text-shadow:2px 3px 2px #000;pointer-events:none;overflow-wrap:anywhere}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.word{display:inline-block;padding:9px;margin:4px;background:#293247;color:white;border-radius:5px;cursor:pointer}
+.word.active{background:#c5ff62;color:#10120b}
+.small{font-size:12px;color:#aab2c5}
+</style>
+</head>
+<body>
+<header><h2>✦ CAPTION STUDIO</h2>
+<div class="small">AI Caption Editor • Creator Edition</div></header>
+<main>
+<section class="panel">
+<h3>01 / Import video</h3>
+<input id="file" type="file" accept="video/*">
+<div class="stage">
+<video id="video" controls playsinline></video>
+<div id="caption"></div>
+</div>
+<p id="status" class="small">Upload a video to begin.</p>
+</section>
+
+<section class="panel">
+<h3>02 / Caption editor</h3>
+<textarea id="text" rows="3" placeholder="Type or paste your caption here..."></textarea>
+<button id="build">CREATE WORD TIMELINE</button>
+<p class="small">Tap any word below to edit its timing.</p>
+<div id="timeline"></div>
+<div class="tools">
+<div><label>Word start (seconds)</label><input id="start" type="number" min="0" step=".05" value="0"></div>
+<div><label>Word end (seconds)</label><input id="end" type="number" min="0" step=".05" value="1"></div>
+</div>
+<button id="apply">APPLY WORD TIMING</button>
+</section>
+
+<section class="panel">
+<h3>03 / Premium styling</h3>
+<label>Text style</label>
+<select id="style">
+<option value="yellow">Creator Gold</option>
+<option value="neon">Neon Green Glow</option>
+<option value="ice">Ice Blue</option>
+<option value="fire">Fire Gradient</option>
+<option value="metal">Silver Metal</option>
+<option value="pink">Electric Pink</option>
+</select>
+<div class="tools">
+<div><label>Font size</label><input id="size" type="range" min="18" max="60" value="38"></div>
+<div><label>Glow intensity</label><input id="glow" type="range" min="0" max="30" value="12"></div>
+<div><label>Vertical position</label><input id="pos" type="range" min="3" max="85" value="9"></div>
+<div><label>Text outline</label><input id="outline" type="range" min="0" max="5" value="2"></div>
+</div>
+<p class="small">Choose a word, adjust its timing, and preview the result.</p>
+</section>
+
+<section class="panel">
+<h3>04 / Export subtitles</h3>
+<button id="srt">DOWNLOAD SRT FILE</button>
+<p class="small">This version exports subtitle files, not a rendered MP4.</p>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let words=[],selected=-1,videoURL="";
+
+$("file").onchange=()=>{
+ const f=$("file").files[0];
+ if(!f)return;
+ if(videoURL)URL.revokeObjectURL(videoURL);
+ videoURL=URL.createObjectURL(f);
+ $("video").src=videoURL;
+ $("status").textContent="Video loaded. Add captions below.";
+};
+
+function makeTimeline(){
+ const text=$("text").value.trim();
+ if(!text){$("status").textContent="Enter some caption text first.";return;}
+ const duration=$("video").duration;
+ const total=Number.isFinite(duration)&&duration>0?duration:Math.max(5,text.split(/\s+/).length*.4);
+ words=text.split(/\s+/).map((word,i)=>({
+  text:word,start:i*total/text.split(/\s+/).length,
+  end:(i+1)*total/text.split(/\s+/).length
+ }));
+ selected=-1;draw();$("status").textContent="Word timeline created. Tap a word to edit.";
+}
+function draw(){
+ $("timeline").innerHTML="";
+ words.forEach((w,i)=>{
+  const b=document.createElement("button");
+  b.className="word"+(i===selected?" active":"");
+  b.textContent=w.text;
+  b.onclick=()=>{selected=i;$("start").value=w.start.toFixed(2);$("end").value=w.end.toFixed(2);draw();};
+  $("timeline").appendChild(b);
+ });
+}
+$("build").onclick=makeTimeline;
+$("apply").onclick=()=>{
+ if(selected<0||!words[selected]){$("status").textContent="Select a word first.";return;}
+ let s=Number($("start").value),e=Number($("end").value);
+ if(!Number.isFinite(s)||!Number.isFinite(e)||s<0||e<=s){$("status").textContent="End must be greater than start.";return;}
+ words[selected].start=s;words[selected].end=e;draw();
+ $("status").textContent="Word timing updated.";
+};
+$("video").ontimeupdate=()=>{
+ const t=$("video").currentTime;
+ const w=words.find(w=>t>=w.start&&t<w.end);
+ $("caption").textContent=w?w.text:"";
+};
+function style(){
+ const c=$("caption"),s=$("style").value;
+ const colors={yellow:"#ffe45e",neon:"#a9ff45",ice:"#72edff",fire:"#ff7b39",metal:"#eeeeff",pink:"#ff64d7"};
+ c.style.color=colors[s];
+ c.style.background=s==="fire"?"linear-gradient(90deg,#ff402b,#ffce42)":s==="metal"?"linear-gradient(#fff,#8a9bb5,#fff)":"none";
+ c.style.backgroundClip=s==="fire"||s==="metal"?"text":"border-box";
+ c.style.webkitBackgroundClip=s==="fire"||s==="metal"?"text":"border-box";
+ c.style.webkitTextFillColor=s==="fire"||s==="metal"?"transparent":"";
+ c.style.fontSize=$("size").value+"px";
+ c.style.textShadow=`0 0 ${$("glow").value}px ${colors[s]},2px 3px 2px #000`;
+ c.style.bottom=$("pos").value+"%";
+ c.style.webkitTextStroke=$("outline").value+"px #101010";
+}
+["style","size","glow","pos","outline"].forEach(id=>$(id).oninput=style);
+function stamp(t){
+ let ms=Math.round(t*1000);
+ let h=Math.floor(ms/3600000);ms%=3600000;
+ let m=Math.floor(ms/60000);ms%=60000;
+ let s=Math.floor(ms/1000);ms%=1000;
+ return [h,m,s].map(n=>String(n).padStart(2,"0")).join(":")+","+String(ms).padStart(3,"0");
+}
+$("srt").onclick=()=>{
+ if(!words.length){$("status").textContent="Create the word timeline first.";return;}
+ const lines=words.map((w,i)=>`${i+1}\n${stamp(w.start)} --> ${stamp(w.end)}\n${w.text}`);
+ const blob=new Blob([lines.join("\n\n")],{type:"text/plain;charset=utf-8"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="captions.srt";a.click();
+ URL.revokeObjectURL(a.href);
+};
+style();
+</script>
+</body>
+</html>
